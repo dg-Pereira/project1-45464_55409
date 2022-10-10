@@ -13,7 +13,7 @@ const (
 
 type Msg struct {
 	Type MsgType
-	//TODO: May add more here fields here.
+	//TODO: May add more fields here.
 }
 
 func MakeController(file *parser.DepFile) chan *Msg {
