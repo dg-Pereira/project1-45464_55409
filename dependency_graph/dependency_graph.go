@@ -8,27 +8,32 @@ type Graph interface {
 	GetGraphSize() int
 }
 
-func NewGraph() map[string][]string {
-	return make(map[string][]string)
+type Node struct {
+	Target       string
+	ToDependents chan *Msg
 }
 
-func AddToGraph(graph map[string][]string, target string, dep string) map[string][]string {
-	graph[target] = append(graph[target], dep)
-	return graph
+type MsgType = int
+
+const (
+	BuildSuccess MsgType = iota
+	BuildError
+)
+
+// need to replicate Msg to not have circular dependency
+type Msg struct {
+	Type MsgType
+	//TODO: May add more fields here.
 }
 
-func GetDeps(graph map[string][]string, target string) []string {
-	return graph[target]
+func NewGraph() map[string][]Node {
+	return make(map[string][]Node)
 }
 
-func GetTargets(graph map[string][]string) []string {
-	var targets []string
-	for target := range graph {
-		targets = append(targets, target)
+func Add(dep string, target string, graph map[string][]Node, toDependents chan *Msg) map[string][]Node {
+	if _, ok := graph[dep]; !ok {
+		graph[dep] = []Node{}
 	}
-	return targets
-}
-
-func GetGraphSize(graph map[string][]string) int {
-	return len(graph)
+	graph[dep] = append(graph[dep], Node{Target: target, ToDependents: toDependents})
+	return graph
 }

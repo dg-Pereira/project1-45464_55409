@@ -2,6 +2,7 @@ package main
 
 import (
 	"cpl_go_proj22/builder"
+	"cpl_go_proj22/dependency_graph"
 	"cpl_go_proj22/parser"
 	"flag"
 	"fmt"
@@ -9,10 +10,10 @@ import (
 	"time"
 )
 
-func oneShot(c chan *builder.Msg) {
+func oneShot(c chan *dependency_graph.Msg) {
 	c <- nil
 	m := <-c
-	if m.Type == builder.BuildSuccess {
+	if m.Type == dependency_graph.BuildSuccess {
 		fmt.Println("Build was a success.")
 	} else {
 		fmt.Println("Something went wrong with the build.")
