@@ -45,7 +45,7 @@ func MakeController(file *parser.DepFile) chan *dependency_graph.Msg {
 }
 
 func buildNode(node *dependency_graph.Node) {
-	_, err := utils.Build(node.Target)
+	timestamp, err := utils.Build(node.Target)
 	if err != nil {
 		//send message to all parents
 		for i := 0; i < node.ParentNum; i++ {
@@ -54,7 +54,7 @@ func buildNode(node *dependency_graph.Node) {
 	} else {
 		//send message to all parents
 		for i := 0; i < node.ParentNum; i++ {
-			node.ToParents <- &dependency_graph.Msg{Type: dependency_graph.BuildSuccess, Timestamp: time.Now()}
+			node.ToParents <- &dependency_graph.Msg{Type: dependency_graph.BuildSuccess, Timestamp: timestamp}
 		}
 	}
 }
