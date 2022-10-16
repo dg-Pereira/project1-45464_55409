@@ -40,3 +40,7 @@ func Add(target string, newNode *Node, graph map[string][]*Node) map[string][]*N
 
 	return graph
 }
+
+func IsLeaf(node *Node, graph map[string][]*Node) bool {
+	return len(graph[node.Target]) == 0
+}

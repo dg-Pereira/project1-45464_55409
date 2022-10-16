@@ -43,6 +43,19 @@ func MakeController(file *parser.DepFile) chan *dependency_graph.Msg {
 	return reqCh
 }
 
+func buildNode(node *dependency_graph.Node) {
+	_, err := utils.Build(node.Target)
+	if err != nil {
+		for i := 0; i < node.ParentNum; i++ {
+			node.ToParents <- &dependency_graph.Msg{Type: dependency_graph.BuildError}
+		}
+	} else {
+		for i := 0; i < node.ParentNum; i++ {
+			node.ToParents <- &dependency_graph.Msg{Type: dependency_graph.BuildSuccess}
+		}
+	}
+}
+
 func build(node *dependency_graph.Node, graph map[string][]*dependency_graph.Node) {
 
 	// wait for messages from all children to build
@@ -54,16 +67,15 @@ func build(node *dependency_graph.Node, graph map[string][]*dependency_graph.Nod
 		}
 	}
 
-	//build node
-	_, err := utils.Build(node.Target)
-	if err != nil {
-		for i := 0; i < node.ParentNum; i++ {
-			node.ToParents <- &dependency_graph.Msg{Type: dependency_graph.BuildError}
+	if dependency_graph.IsLeaf(node, graph) {
+		_, err := utils.Status(node.Target)
+		if err == nil { //don't build
+			node.ToParents <- &dependency_graph.Msg{Type: dependency_graph.BuildSuccess}
+		} else {
+			buildNode(node)
 		}
 	} else {
-		for i := 0; i < node.ParentNum; i++ {
-			node.ToParents <- &dependency_graph.Msg{Type: dependency_graph.BuildSuccess}
-		}
+		buildNode(node)
 	}
 }
 
