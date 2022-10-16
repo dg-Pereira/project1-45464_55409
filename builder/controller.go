@@ -4,6 +4,7 @@ import (
 	"cpl_go_proj22/dependency_graph"
 	"cpl_go_proj22/parser"
 	"cpl_go_proj22/utils"
+	"time"
 )
 
 func MakeController(file *parser.DepFile) chan *dependency_graph.Msg {
@@ -46,36 +47,55 @@ func MakeController(file *parser.DepFile) chan *dependency_graph.Msg {
 func buildNode(node *dependency_graph.Node) {
 	_, err := utils.Build(node.Target)
 	if err != nil {
+		//send message to all parents
 		for i := 0; i < node.ParentNum; i++ {
-			node.ToParents <- &dependency_graph.Msg{Type: dependency_graph.BuildError}
+			node.ToParents <- &dependency_graph.Msg{Type: dependency_graph.BuildError, Timestamp: time.Time{}}
 		}
 	} else {
+		//send message to all parents
 		for i := 0; i < node.ParentNum; i++ {
-			node.ToParents <- &dependency_graph.Msg{Type: dependency_graph.BuildSuccess}
+			node.ToParents <- &dependency_graph.Msg{Type: dependency_graph.BuildSuccess, Timestamp: time.Now()}
 		}
 	}
 }
 
 func build(node *dependency_graph.Node, graph map[string][]*dependency_graph.Node) {
 
+	mostRecentTimestamp := time.Time{}
 	// wait for messages from all children to build
 	for _, child := range node.ToChildren {
 		m := <-child
 		if m.Type == dependency_graph.BuildError {
-			node.ToParents <- m
+			//send message to all parents
+			for i := 0; i < node.ParentNum; i++ {
+				node.ToParents <- m
+			}
 			return
 		}
-	}
-
-	if dependency_graph.IsLeaf(node, graph) {
-		_, err := utils.Status(node.Target)
-		if err == nil { //don't build
-			node.ToParents <- &dependency_graph.Msg{Type: dependency_graph.BuildSuccess}
-		} else {
-			buildNode(node)
+		if m.Timestamp.After(mostRecentTimestamp) {
+			mostRecentTimestamp = m.Timestamp
 		}
-	} else {
+	}
+	_, err := utils.Status(node.Target)
+	//if file does not exist, build it
+	if err != nil {
 		buildNode(node)
+	} else if dependency_graph.IsLeaf(node, graph) { // if file exists and is a leaf, dont build it
+		thisTimestamp := utils.GetModTime(node.Target)
+		//send message to all parents
+		for i := 0; i < node.ParentNum; i++ {
+			node.ToParents <- &dependency_graph.Msg{Type: dependency_graph.BuildSuccess, Timestamp: thisTimestamp}
+		}
+	} else { // if file exists and is not a leaf, check if it is up to date, and if not, build it
+		thisTimestamp := utils.GetModTime(node.Target)
+		if mostRecentTimestamp.After(thisTimestamp) {
+			buildNode(node)
+		} else {
+			//send message to all parents
+			for i := 0; i < node.ParentNum; i++ {
+				node.ToParents <- &dependency_graph.Msg{Type: dependency_graph.BuildSuccess, Timestamp: thisTimestamp}
+			}
+		}
 	}
 }
 

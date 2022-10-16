@@ -1,5 +1,7 @@
 package dependency_graph
 
+import "time"
+
 type Graph interface {
 	AddToGraph() map[string][]string
 	GetDeps() []string
@@ -23,7 +25,8 @@ const (
 )
 
 type Msg struct {
-	Type MsgType
+	Type      MsgType
+	Timestamp time.Time
 	//TODO: May add more fields here.
 }
 
