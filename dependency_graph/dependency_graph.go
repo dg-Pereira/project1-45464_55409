@@ -9,8 +9,10 @@ type Graph interface {
 }
 
 type Node struct {
-	Target       string
-	ToDependents chan *Msg
+	Target     string
+	ToChildren []chan *Msg
+	ToParents  chan *Msg
+	ParentNum  int
 }
 
 type MsgType = int
@@ -20,20 +22,21 @@ const (
 	BuildError
 )
 
-// need to replicate Msg to not have circular dependency
 type Msg struct {
 	Type MsgType
 	//TODO: May add more fields here.
 }
 
-func NewGraph() map[string][]Node {
-	return make(map[string][]Node)
+func NewGraph() map[string][]*Node {
+	return make(map[string][]*Node)
 }
 
-func Add(dep string, target string, graph map[string][]Node, toDependents chan *Msg) map[string][]Node {
-	if _, ok := graph[dep]; !ok {
-		graph[dep] = []Node{}
+func Add(target string, newNode *Node, graph map[string][]*Node) map[string][]*Node {
+
+	if _, ok := graph[target]; !ok {
+		graph[target] = make([]*Node, 0)
 	}
-	graph[dep] = append(graph[dep], Node{Target: target, ToDependents: toDependents})
+	graph[target] = append(graph[target], newNode)
+
 	return graph
 }
