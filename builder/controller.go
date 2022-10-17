@@ -26,18 +26,20 @@ func MakeController(file *parser.DepFile) chan *dependency_graph.Msg {
 	//	}
 	//}()
 	go func() {
-		<-reqCh
-		graph, nodes := makeGraph(file)
-		printGraph(graph)
+		for {
+			<-reqCh
+			graph, nodes := makeGraph(file)
+			//printGraph(graph)
 
-		for node := range nodes {
-			go build(nodes[node], graph)
+			for node := range nodes {
+				go build(nodes[node], graph)
+			}
+
+			//wait for message from root
+			m := <-nodes[file.Rules[0].Object].ToParents
+
+			reqCh <- m
 		}
-
-		//wait for message from root
-		<-nodes[file.Rules[0].Object].ToParents
-
-		reqCh <- &dependency_graph.Msg{Type: dependency_graph.BuildSuccess}
 	}()
 
 	//make leaves start waiting from 1 message, to make the leave message start the build
@@ -147,8 +149,6 @@ func makeGraph(file *parser.DepFile) (map[string][]*dependency_graph.Node, map[s
 			}
 		}
 	}
-
-	println(nodes["root"].Target, len(nodes["root"].ToChildren), nodes["root"].ToParents)
 
 	return graph, nodes
 
