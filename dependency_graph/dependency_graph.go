@@ -27,7 +27,6 @@ const (
 type Msg struct {
 	Type      MsgType
 	Timestamp time.Time
-	//TODO: May add more fields here.
 }
 
 func NewGraph() map[string][]*Node {

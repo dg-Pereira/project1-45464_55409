@@ -9,44 +9,32 @@ import (
 
 func MakeController(file *parser.DepFile) chan *dependency_graph.Msg {
 	reqCh := make(chan *dependency_graph.Msg)
-	//rootCh := make(chan *Msg)
-	//var leafCh chan interface{} //TODO: You may want to change this type
-	// TODO: Startup system that emits outcome of build on rootCh, triggered by an output on leafCh
-	//go func() {
-	//	<-reqCh
-	//	leafCh <- nil
-	//	m := <-rootCh
-	//	switch m.Type {
-	//	case BuildSuccess:
-	//		reqCh <- m
-	//		break
-	//	case BuildError:
-	//		reqCh <- m
-	//		break
-	//	}
-	//}()
 	go func() {
 		for {
 			<-reqCh
 			graph, nodes := makeGraph(file)
+			addChannelsToNodes(file, graph, nodes)
+
 			//printGraph(graph)
 
 			for node := range nodes {
 				go build(nodes[node], graph)
 			}
 
+			rootCh := nodes[file.Rules[0].Object].ToParents
+
 			//wait for message from root
-			m := <-nodes[file.Rules[0].Object].ToParents
+			m := <-rootCh
 
 			reqCh <- m
 		}
 	}()
 
-	//make leaves start waiting from 1 message, to make the leave message start the build
 	return reqCh
 }
 
 func buildNode(node *dependency_graph.Node) {
+	println("Building", node.Target)
 	timestamp, err := utils.Build(node.Target)
 	if err != nil {
 		//send message to all parents
@@ -78,9 +66,10 @@ func build(node *dependency_graph.Node, graph map[string][]*dependency_graph.Nod
 			mostRecentTimestamp = m.Timestamp
 		}
 	}
+
 	_, err := utils.Status(node.Target)
-	//if file does not exist, build it
-	if err != nil {
+
+	if err != nil { //if file does not exist, build it
 		buildNode(node)
 	} else if dependency_graph.IsLeaf(node, graph) { // if file exists and is a leaf, dont build it
 		thisTimestamp := utils.GetModTime(node.Target)
@@ -116,6 +105,7 @@ func makeGraph(file *parser.DepFile) (map[string][]*dependency_graph.Node, map[s
 	graph := dependency_graph.NewGraph()
 	nodes := make(map[string]*dependency_graph.Node)
 
+	//make nodes
 	for _, rule := range file.Rules {
 		target := rule.Object
 
@@ -135,21 +125,25 @@ func makeGraph(file *parser.DepFile) (map[string][]*dependency_graph.Node, map[s
 		}
 	}
 
-	//add communication channels between nodes
-	nodes[file.Rules[0].Object].ToParents = make(chan *dependency_graph.Msg)
-	for target := range graph {
-		for _, node := range graph[target] {
-			if node.ToParents != nil {
-				nodes[target].ToChildren = append(nodes[target].ToChildren, node.ToParents)
-				node.ParentNum++
-			} else {
-				toChild := make(chan *dependency_graph.Msg)
-				node.ToParents = toChild
-				nodes[target].ToChildren = append(nodes[target].ToChildren, toChild)
-			}
-		}
-	}
-
 	return graph, nodes
 
+}
+
+func addChannelsToNodes(file *parser.DepFile, graph map[string][]*dependency_graph.Node, nodes map[string]*dependency_graph.Node) {
+	//add communication channels between nodes
+
+	//root node is a special case, needs channel to communicate with controller even though it doesn't have a parent
+	nodes[file.Rules[0].Object].ToParents = make(chan *dependency_graph.Msg)
+
+	for target := range graph {
+		for _, node := range graph[target] {
+			if node.ToParents == nil {
+				toChild := make(chan *dependency_graph.Msg)
+				node.ToParents = toChild
+			} else {
+				node.ParentNum++
+			}
+			nodes[target].ToChildren = append(nodes[target].ToChildren, node.ToParents)
+		}
+	}
 }
